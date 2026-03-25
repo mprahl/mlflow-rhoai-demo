@@ -16,6 +16,7 @@ dependencies = [
     "langchain",
     "langchain-google-genai",
     "langgraph",
+    "litellm",
     "mlflow @ git+https://github.com/mlflow/mlflow@7ff7c1ec4b1400b6563aee2dee5bc37e788493c9",
     "python-dotenv",
 ]
@@ -23,6 +24,7 @@ dependencies = [
 [project.scripts]
 mlflow-notes-agent = "mlflow_notes_agent.__main__:main"
 mlflow-notes-agent-serve = "mlflow_notes_agent._serve:main"
+mlflow-notes-agent-judge = "mlflow_notes_agent.judges:main"
 
 [dependency-groups]
 dev = [

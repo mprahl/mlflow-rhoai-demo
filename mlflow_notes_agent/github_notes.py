@@ -113,6 +113,32 @@ class GitHubNotesClient:
         decoded = base64.b64decode(content).decode("utf-8")
         return payload["path"], decoded
 
+    def delete_note(self, filename: str, *, commit_message: str) -> dict[str, str]:
+        normalized_name = filename.strip().lstrip("/")
+        payload = self._request(
+            "GET",
+            f"/repos/{self.settings.github_repo}/contents/{normalized_name}",
+            params={"ref": self.settings.github_branch},
+        )
+        if payload.get("type") != "file":
+            raise RuntimeError(f"{filename} is not a markdown file.")
+
+        result = self._request(
+            "DELETE",
+            f"/repos/{self.settings.github_repo}/contents/{normalized_name}",
+            json={
+                "branch": self.settings.github_branch,
+                "message": commit_message,
+                "sha": payload["sha"],
+            },
+        )
+        commit = result.get("commit", {})
+        return {
+            "filename": normalized_name,
+            "commit_sha": commit.get("sha", ""),
+            "html_url": self._file_html_url(normalized_name),
+        }
+
     def _existing_note_names(self) -> set[str]:
         return {note.name for note in self.list_notes()}
 

@@ -14,8 +14,10 @@ The assistant can:
 
 - search the web with DuckDuckGo
 - search Wikipedia
+- answer with awareness of today's date
 - list saved notes from GitHub
 - read saved notes from GitHub
+- delete saved notes from GitHub
 - save a new markdown note into the configured GitHub repo and branch
 
 Each saved note is created with a filename like `YYYY-MM-DD-summary.md`.
@@ -121,6 +123,11 @@ injecting environment variables into the backend and frontend containers.
 - The backend only depends on env vars for GitHub, Gemini, and MLflow settings.
 - The frontend only needs the public LangGraph API URL and assistant id.
 - MLflow tracing is configured at startup with `mlflow.langchain.autolog()`.
+- `mlflow-notes-agent-judge --trace-id <trace_id>` runs two Gemini-powered MLflow judges
+  against a trace: `tool_accuracy_ok` and `low_user_frustration`.
+- `mlflow-notes-agent-judge --experiment-name mlflow-demo --max-traces 20`
+  fetches traces from that experiment and scores only the ones still missing
+  one or both judge assessments.
 
 ## Important Files
 
@@ -128,6 +135,7 @@ injecting environment variables into the backend and frontend containers.
 - `Containerfile`
 - `langgraph.json`
 - `mlflow_notes_agent/agent.py`
+- `mlflow_notes_agent/judges.py`
 - `mlflow_notes_agent/tools.py`
 - `mlflow_notes_agent/github_notes.py`
 - `mlflow_notes_agent/webapp.py`

@@ -4,8 +4,8 @@ USER 0
 
 WORKDIR /opt/app-root/src
 
-RUN microdnf install -y python3.12 python3.12-pip git \
-    && microdnf clean all \
+RUN dnf install -y python3.12 python3.12-pip git \
+    && dnf clean all \
     && python3.12 -m pip install --no-cache-dir uv
 
 COPY pyproject.toml uv.lock README.md langgraph.json ./

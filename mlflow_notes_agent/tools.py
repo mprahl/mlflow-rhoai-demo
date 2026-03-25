@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from datetime import date
+from datetime import date, datetime
 from textwrap import dedent
 from typing import Any
 from urllib.parse import quote
@@ -36,6 +36,65 @@ def _format_search_results(title: str, results: list[dict[str, Any]]) -> str:
             ]
         )
     return "\n".join(lines)
+
+
+def _normalize_markdown_block(text: str) -> str:
+    dedented = dedent(text).strip()
+    lines = [line.rstrip() for line in dedented.splitlines()]
+
+    normalized_lines: list[str] = []
+    previous_blank = False
+    for line in lines:
+        stripped_line = line.lstrip()
+        if stripped_line and not re.match(r"^([-*#>]|```|\d+\.)", stripped_line):
+            line = stripped_line
+        is_blank = not line.strip()
+        if is_blank and previous_blank:
+            continue
+        normalized_lines.append(line)
+        previous_blank = is_blank
+    return "\n".join(normalized_lines).strip()
+
+
+def _build_note_markdown(
+    *,
+    title: str,
+    summary: str,
+    notes_markdown: str,
+    source_urls: list[str] | None = None,
+) -> str:
+    cleaned_sources = [source.strip() for source in (source_urls or []) if source.strip()]
+    note_body = _normalize_markdown_block(notes_markdown)
+
+    sections = [
+        f"# {title.strip()}",
+        "",
+        f"- Date: {date.today().isoformat()}",
+        f"- Summary: {summary.strip()}",
+        "",
+        "## Notes",
+        note_body,
+    ]
+    if cleaned_sources:
+        sections.extend(
+            [
+                "",
+                "## Sources",
+                *[f"- {source}" for source in cleaned_sources],
+            ]
+        )
+    return "\n".join(sections).strip() + "\n"
+
+
+@tool
+def get_today_date() -> str:
+    """Return today's date for the running environment."""
+    today = date.today()
+    now = datetime.now().astimezone()
+    return (
+        f"Today's date is {today.isoformat()}. "
+        f"Current local time is {now.strftime('%Y-%m-%d %H:%M:%S %Z')}."
+    )
 
 
 @tool
@@ -129,6 +188,24 @@ def read_note(filename: str) -> str:
 
 
 @tool
+def delete_note(filename: str) -> str:
+    """Delete an existing markdown note from the configured GitHub repository branch."""
+    try:
+        client = GitHubNotesClient()
+        result = client.delete_note(
+            filename,
+            commit_message=f"Delete note {filename.strip().lstrip('/')}",
+        )
+    except RuntimeError as exc:
+        raise ToolException(str(exc)) from exc
+
+    return (
+        f"Deleted note {result['filename']} from GitHub. "
+        f"Previous path was {result['html_url']}."
+    )
+
+
+@tool
 def save_note(
     title: str,
     summary: str,
@@ -139,24 +216,12 @@ def save_note(
     try:
         client = GitHubNotesClient()
         filename = client.build_note_filename(summary)
-
-        source_lines = ""
-        cleaned_sources = [source.strip() for source in (source_urls or []) if source.strip()]
-        if cleaned_sources:
-            source_lines = "\n## Sources\n" + "\n".join(f"- {source}" for source in cleaned_sources)
-
-        markdown = dedent(
-            f"""\
-            # {title}
-
-            - Date: {date.today().isoformat()}
-            - Summary: {summary.strip()}
-
-            ## Notes
-            {notes_markdown.strip()}
-            {source_lines}
-            """
-        ).strip() + "\n"
+        markdown = _build_note_markdown(
+            title=title,
+            summary=summary,
+            notes_markdown=notes_markdown,
+            source_urls=source_urls,
+        )
 
         result = client.write_note(
             filename,
@@ -173,9 +238,11 @@ def save_note(
 
 
 NOTES_TOOLS = [
+    get_today_date,
     search_duckduckgo,
     search_wikipedia,
     list_notes,
     read_note,
+    delete_note,
     save_note,
 ]
