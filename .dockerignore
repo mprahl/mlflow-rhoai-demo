@@ -1,0 +1,11 @@
+.env
+.venv/
+.git/
+.langgraph_api/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+node_modules/
+ui/node_modules/
+.next/
+ui/.next/

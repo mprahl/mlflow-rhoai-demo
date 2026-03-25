@@ -114,6 +114,10 @@ Then open [http://127.0.0.1:3000](http://127.0.0.1:3000).
 This repo is set up so the same code can run locally or in OpenShift by
 injecting environment variables into the backend and frontend containers.
 
+- The root `Containerfile` builds a single UBI 10-based image with both the
+  Python backend dependencies and the built Next.js frontend.
+- Override the container command in Kubernetes manifests depending on whether
+  the workload should run the LangGraph backend or the Next.js frontend.
 - The backend only depends on env vars for GitHub, Gemini, and MLflow settings.
 - The frontend only needs the public LangGraph API URL and assistant id.
 - MLflow tracing is configured at startup with `mlflow.langchain.autolog()`.
@@ -121,6 +125,7 @@ injecting environment variables into the backend and frontend containers.
 ## Important Files
 
 - `pyproject.toml`
+- `Containerfile`
 - `langgraph.json`
 - `mlflow_notes_agent/agent.py`
 - `mlflow_notes_agent/tools.py`
