@@ -1,0 +1,14 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+RUN pip install --no-cache-dir uv
+
+COPY pyproject.toml README.md langgraph.json ./
+COPY mlflow_notes_agent ./mlflow_notes_agent
+
+RUN uv sync --group dev
+
+EXPOSE 2024
+
+CMD ["uv", "run", "mlflow-notes-agent-serve", "--host", "0.0.0.0", "--port", "2024"]
