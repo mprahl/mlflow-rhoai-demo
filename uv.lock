@@ -2208,6 +2208,7 @@ dependencies = [
     { name = "langchain" },
     { name = "langchain-google-genai" },
     { name = "langgraph" },
+    { name = "langgraph-cli", extra = ["inmem"] },
     { name = "litellm" },
     { name = "mlflow" },
     { name = "python-dotenv" },
@@ -2215,7 +2216,6 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "langgraph-cli", extra = ["inmem"] },
     { name = "ruff" },
 ]
 
@@ -2228,16 +2228,14 @@ requires-dist = [
     { name = "langchain" },
     { name = "langchain-google-genai" },
     { name = "langgraph" },
+    { name = "langgraph-cli", extras = ["inmem"] },
     { name = "litellm" },
     { name = "mlflow", git = "https://github.com/mlflow/mlflow?rev=7ff7c1ec4b1400b6563aee2dee5bc37e788493c9" },
     { name = "python-dotenv" },
 ]
 
 [package.metadata.requires-dev]
-dev = [
-    { name = "langgraph-cli", extras = ["inmem"] },
-    { name = "ruff" },
-]
+dev = [{ name = "ruff" }]
 
 [[package]]
 name = "multidict"

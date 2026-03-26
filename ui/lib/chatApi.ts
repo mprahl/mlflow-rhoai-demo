@@ -4,7 +4,7 @@ import {
   LangGraphCommand,
 } from "@assistant-ui/react-langgraph";
 
-const DEFAULT_LANGGRAPH_API_URL = "http://127.0.0.1:2024";
+const DEFAULT_LANGGRAPH_API_URL = "/api/langgraph";
 const DEFAULT_ASSISTANT_ID = "agent";
 
 const getApiUrl = () => {

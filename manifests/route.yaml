@@ -1,0 +1,16 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: mlflow-notes-agent-ui
+  namespace: mlflow-demo-agent
+  labels:
+    app: mlflow-notes-agent
+spec:
+  to:
+    kind: Service
+    name: mlflow-notes-agent-ui
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

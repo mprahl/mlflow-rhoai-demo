@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi10/nodejs-22
+FROM registry.access.redhat.com/ubi10/nodejs-22 AS python-builder
 
 USER 0
 
@@ -11,20 +11,39 @@ RUN dnf install -y python3.12 python3.12-pip git \
 COPY pyproject.toml uv.lock README.md langgraph.json ./
 COPY mlflow_notes_agent ./mlflow_notes_agent
 
-RUN uv sync --frozen --group dev
+RUN uv sync --frozen --no-dev --no-editable
 
-COPY ui/package.json ui/package-lock.json ./ui/
-RUN npm ci --prefix ui
+FROM registry.access.redhat.com/ubi10/nodejs-22 AS ui-builder
 
-COPY ui ./ui
-RUN npm run build --prefix ui
+USER 0
+
+WORKDIR /opt/app-root/src/ui
+
+COPY ui/package.json ui/package-lock.json ./
+RUN npm ci
+
+COPY ui ./
+RUN npm run build
+
+FROM registry.access.redhat.com/ubi10/nodejs-22
+
+USER 0
+
+WORKDIR /opt/app-root/src
+
+RUN dnf install -y python3.12 \
+    && dnf clean all
+
+COPY --from=python-builder --chown=1001:0 /opt/app-root/src/.venv ./.venv
+COPY --chown=1001:0 pyproject.toml README.md langgraph.json ./
+COPY --chown=1001:0 mlflow_notes_agent ./mlflow_notes_agent
+COPY --from=ui-builder --chown=1001:0 /opt/app-root/src/ui/.next/standalone ./ui
+COPY --from=ui-builder --chown=1001:0 /opt/app-root/src/ui/.next/static ./ui/.next/static
 
 ENV PATH="/opt/app-root/src/.venv/bin:${PATH}"
-
-RUN chown -R 1001:0 /opt/app-root/src
 
 USER 1001
 
 EXPOSE 2024 3000
 
-CMD ["uv", "run", "mlflow-notes-agent-serve", "--host", "0.0.0.0", "--port", "2024"]
+CMD ["/opt/app-root/src/.venv/bin/mlflow-notes-agent-serve", "--host", "0.0.0.0", "--port", "2024"]

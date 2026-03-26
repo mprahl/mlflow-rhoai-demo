@@ -116,10 +116,17 @@ Then open [http://127.0.0.1:3000](http://127.0.0.1:3000).
 This repo is set up so the same code can run locally or in OpenShift by
 injecting environment variables into the backend and frontend containers.
 
-- The root `Containerfile` builds a single UBI 10-based image with both the
-  Python backend dependencies and the built Next.js frontend.
+- The `manifests/` directory deploys one Pod with two containers: the LangGraph
+  backend and the standalone Next.js UI.
+- The UI container proxies `/api/langgraph/*` to `http://127.0.0.1:2024`, so
+  only the UI needs an OpenShift Route.
+- The root `Containerfile` uses multi-stage builds so the final UBI 10-based
+  runtime image keeps only the Python runtime environment and the built
+  standalone Next.js frontend.
 - Override the container command in Kubernetes manifests depending on whether
   the workload should run the LangGraph backend or the Next.js frontend.
+- The default container command starts the LangGraph backend. To run the
+  frontend from the same image, override the command to `node ui/server.js`.
 - The backend only depends on env vars for GitHub, Gemini, and MLflow settings.
 - The frontend only needs the public LangGraph API URL and assistant id.
 - MLflow tracing is configured at startup with `mlflow.langchain.autolog()`.
@@ -128,6 +135,52 @@ injecting environment variables into the backend and frontend containers.
 - `mlflow-notes-agent-judge --experiment-name mlflow-demo --max-traces 20`
   fetches traces from that experiment and scores only the ones still missing
   one or both judge assessments.
+
+### Deploy To OpenShift
+
+Create the namespace once:
+
+```bash
+oc new-project mlflow-demo-agent
+```
+
+Create or replace the backend Secret directly from `.env`:
+
+```bash
+oc project mlflow-demo-agent
+oc create secret generic mlflow-notes-agent-env \
+  --from-env-file=.env \
+  --dry-run=client -o yaml | oc apply -f -
+```
+
+The OpenShift deployment overrides `MLFLOW_TRACKING_URI` to the in-cluster
+`mlflow.redhat-ods-applications.svc` service and sets `REQUESTS_CA_BUNDLE` to
+the projected OpenShift service CA. That lets the Secret still come from your
+existing `.env` while avoiding the external OAuth-protected gateway route from
+inside the cluster. This is to avoid a bug in RHOAI 3.3 where service account tokens don't work on the gateway.
+
+The manifests also create a dedicated `mlflow-notes-agent` ServiceAccount in
+`mlflow-demo-agent` and bind it to a Role in the `mlflow-demo` workspace
+namespace so the pod can create and update MLflow experiments and traces using
+the Kubernetes-backed MLflow authorization plugin.
+
+Apply the manifests:
+
+```bash
+oc apply -k manifests
+```
+
+Watch the rollout:
+
+```bash
+oc rollout status deploy/mlflow-notes-agent
+```
+
+Get the UI Route:
+
+```bash
+oc get route mlflow-notes-agent-ui -o jsonpath='https://{.spec.host}{"\n"}'
+```
 
 ## Important Files
 

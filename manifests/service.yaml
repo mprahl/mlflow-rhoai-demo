@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: mlflow-notes-agent-ui
+  namespace: mlflow-demo-agent
+  labels:
+    app: mlflow-notes-agent
+spec:
+  selector:
+    app: mlflow-notes-agent
+  ports:
+    - name: http
+      port: 80
+      targetPort: ui-http

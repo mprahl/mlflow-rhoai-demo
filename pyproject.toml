@@ -15,6 +15,7 @@ dependencies = [
     "kubernetes",
     "langchain",
     "langchain-google-genai",
+    "langgraph-cli[inmem]",
     "langgraph",
     "litellm",
     "mlflow @ git+https://github.com/mlflow/mlflow@7ff7c1ec4b1400b6563aee2dee5bc37e788493c9",
@@ -28,7 +29,6 @@ mlflow-notes-agent-judge = "mlflow_notes_agent.judges:main"
 
 [dependency-groups]
 dev = [
-    "langgraph-cli[inmem]",
     "ruff",
 ]
 

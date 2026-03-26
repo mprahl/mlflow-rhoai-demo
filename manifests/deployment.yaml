@@ -1,0 +1,73 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mlflow-notes-agent
+  namespace: mlflow-demo-agent
+  labels:
+    app: mlflow-notes-agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mlflow-notes-agent
+  template:
+    metadata:
+      labels:
+        app: mlflow-notes-agent
+    spec:
+      serviceAccountName: mlflow-notes-agent
+      containers:
+        - name: backend
+          image: quay.io/mprahl/mlflow-rhoai-demo:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 2024
+              name: backend-http
+          envFrom:
+            - secretRef:
+                name: mlflow-notes-agent-env
+          env:
+            - name: MLFLOW_TRACKING_URI
+              value: https://mlflow.redhat-ods-applications.svc:8443
+            - name: REQUESTS_CA_BUNDLE
+              value: /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: backend-http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: backend-http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+        - name: ui
+          image: quay.io/mprahl/mlflow-rhoai-demo:latest
+          imagePullPolicy: Always
+          command:
+            - node
+            - ui/server.js
+          ports:
+            - containerPort: 3000
+              name: ui-http
+          env:
+            - name: HOSTNAME
+              value: "0.0.0.0"
+            - name: PORT
+              value: "3000"
+            - name: LANGGRAPH_API_URL
+              value: http://127.0.0.1:2024
+          readinessProbe:
+            httpGet:
+              path: /
+              port: ui-http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: ui-http
+            initialDelaySeconds: 15
+            periodSeconds: 20
