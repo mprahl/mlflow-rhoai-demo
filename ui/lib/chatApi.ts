@@ -8,10 +8,15 @@ const DEFAULT_LANGGRAPH_API_URL = "/api/langgraph";
 const DEFAULT_ASSISTANT_ID = "agent";
 
 const getApiUrl = () => {
-  return (
+  const apiUrl =
     process.env["NEXT_PUBLIC_LANGGRAPH_API_URL"]?.trim() ||
-    DEFAULT_LANGGRAPH_API_URL
-  );
+    DEFAULT_LANGGRAPH_API_URL;
+
+  if (typeof window === "undefined") {
+    return apiUrl;
+  }
+
+  return new URL(apiUrl, window.location.origin).toString();
 };
 
 const getAssistantId = () => {
