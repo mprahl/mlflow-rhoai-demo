@@ -23,22 +23,109 @@ def _judge_model_uri() -> str:
     return JUDGE_MODEL_URI
 
 
+def _message_to_text(content) -> str:
+    if isinstance(content, str):
+        return content.strip()
+    if isinstance(content, list):
+        parts = []
+        for item in content:
+            if isinstance(item, dict) and item.get("type") == "text":
+                text = item.get("text", "").strip()
+                if text:
+                    parts.append(text)
+        return "\n".join(parts).strip()
+    return str(content).strip()
+
+
+def _truncate_text(text: str, *, max_chars: int = 1200) -> str:
+    if len(text) <= max_chars:
+        return text
+    return text[: max_chars - 3].rstrip() + "..."
+
+
+def _summarize_messages(messages: list[dict], *, limit: int = 8) -> list[dict]:
+    summary = []
+    for message in messages[-limit:]:
+        if not isinstance(message, dict):
+            continue
+        role = message.get("type") or message.get("role") or "message"
+        text = _truncate_text(_message_to_text(message.get("content", "")), max_chars=700)
+        tool_calls = message.get("tool_calls", [])
+        summary.append(
+            {
+                "role": role,
+                "text": text,
+                "tool_calls": [
+                    {
+                        "name": tool_call.get("name"),
+                        "args": tool_call.get("args"),
+                        "id": tool_call.get("id"),
+                    }
+                    for tool_call in tool_calls
+                    if isinstance(tool_call, dict)
+                ],
+            }
+        )
+    return summary
+
+
+def _summarize_trace(trace: Trace) -> tuple[dict, dict]:
+    root_span = trace.data.spans[0]
+    messages = root_span.inputs.get("messages", []) if isinstance(root_span.inputs, dict) else []
+
+    conversation = _summarize_messages(messages)
+
+    tool_spans = []
+    for span in trace.data.spans:
+        span_type = getattr(span, "span_type", None)
+        if str(span_type).upper().endswith("TOOL"):
+            tool_spans.append(
+                {
+                    "name": span.name,
+                    "inputs": span.inputs,
+                    "outputs": span.outputs,
+                    "status": str(getattr(getattr(span, "status", None), "status_code", "")),
+                }
+            )
+
+    output_messages = []
+    if isinstance(root_span.outputs, dict):
+        output_messages = root_span.outputs.get("messages", [])
+
+    final_output = {
+        "messages": _summarize_messages(output_messages, limit=4),
+        "raw_keys": sorted(root_span.outputs.keys()) if isinstance(root_span.outputs, dict) else [],
+    }
+
+    judge_inputs = {
+        "trace_id": trace.info.trace_id,
+        "conversation": conversation,
+    }
+    judge_outputs = {
+        "tool_calls": tool_spans,
+        "final_output": final_output,
+    }
+    return judge_inputs, judge_outputs
+
+
 @cache
 def get_tool_accuracy_judge(model_uri: str | None = None):
     return make_judge(
         name="tool_accuracy_ok",
         description="Judge whether the agent used tools appropriately and accurately.",
         instructions="""
-        Analyze the {{ trace }} and determine whether the agent's tool usage was accurate.
+        Analyze {{ inputs }} and {{ outputs }}.
 
         Consider:
-        - Did the agent choose the correct tools for the user's request?
+        - Does the conversation show a clear user request?
+        - Did the listed tool calls match the user's request?
         - Were tool arguments reasonable and specific?
-        - Did the final answer faithfully reflect the tool outputs?
+        - Did the final output reflect the tool outputs faithfully?
         - Did the agent avoid unnecessary or misleading tool calls?
 
-        Return true if the tool usage was overall accurate and helpful.
-        Return false if the tool usage was incorrect, misleading, or incomplete.
+        Return only a boolean:
+        - true if the tool usage was overall accurate and helpful
+        - false if the tool usage was incorrect, misleading, or incomplete
         """,
         model=model_uri or _judge_model_uri(),
         feedback_value_type=bool,
@@ -51,17 +138,19 @@ def get_user_frustration_judge(model_uri: str | None = None):
         name="low_user_frustration",
         description="Judge whether the interaction shows low user frustration.",
         instructions="""
-        Analyze the {{ trace }} and assess whether the interaction shows low user frustration.
+        Analyze {{ inputs }} and {{ outputs }} and assess whether
+        the interaction shows low user frustration.
 
         Consider:
         - Did the user need to repeat or restate requests?
-        - Did the agent ignore instructions or fail to complete the task?
+        - Did the assistant ignore instructions or fail to complete the task?
         - Did the final outcome appear to resolve the user's need?
-        - Did the conversation show signals of confusion, dissatisfaction, or friction?
+        - Does the conversation show confusion, dissatisfaction, or friction?
 
-        Return true if the interaction shows low or no user frustration.
-        Return false if the interaction suggests the user was frustrated,
-        dissatisfied, or their request was not resolved well.
+        Return only a boolean:
+        - true if the interaction shows low or no user frustration
+        - false if the interaction suggests the user was frustrated,
+          dissatisfied, or their request was not resolved well
         """,
         model=model_uri or _judge_model_uri(),
         feedback_value_type=bool,
@@ -130,11 +219,12 @@ def assess_trace(
 ):
     configure_mlflow()
     trace = _get_trace_with_retry(trace_id)
+    judge_inputs, judge_outputs = _summarize_trace(trace)
     target_judges = judge_names or list(JUDGE_FACTORIES.keys())
     assessments = []
     for judge_name in target_judges:
         judge = JUDGE_FACTORIES[judge_name](JUDGE_MODEL_URI)
-        assessments.append(judge(trace=trace))
+        assessments.append(judge(inputs=judge_inputs, outputs=judge_outputs))
 
     for assessment in assessments:
         mlflow.log_assessment(trace_id=trace_id, assessment=assessment)
