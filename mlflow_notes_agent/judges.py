@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import cache
 from typing import TYPE_CHECKING
 
@@ -16,11 +17,13 @@ from mlflow_notes_agent.tracing import configure_mlflow
 if TYPE_CHECKING:
     from mlflow.entities import Trace
 
-JUDGE_MODEL_URI = "gemini:/gemini-2.5-pro"
+DEFAULT_JUDGE_MODEL_URI = "gemini:/gemini-2.5-pro"
+DEFAULT_TRACE_WORKERS = 2
+DEFAULT_JUDGE_WORKERS = 2
 
 
-def _judge_model_uri() -> str:
-    return JUDGE_MODEL_URI
+def _judge_model_uri(model_uri: str | None = None) -> str:
+    return model_uri or DEFAULT_JUDGE_MODEL_URI
 
 
 def _message_to_text(content) -> str:
@@ -127,7 +130,7 @@ def get_tool_accuracy_judge(model_uri: str | None = None):
         - true if the tool usage was overall accurate and helpful
         - false if the tool usage was incorrect, misleading, or incomplete
         """,
-        model=model_uri or _judge_model_uri(),
+        model=_judge_model_uri(model_uri),
         feedback_value_type=bool,
     )
 
@@ -152,7 +155,7 @@ def get_user_frustration_judge(model_uri: str | None = None):
         - false if the interaction suggests the user was frustrated,
           dissatisfied, or their request was not resolved well
         """,
-        model=model_uri or _judge_model_uri(),
+        model=_judge_model_uri(model_uri),
         feedback_value_type=bool,
     )
 
@@ -212,49 +215,129 @@ def _get_trace_with_retry(trace_id: str, *, attempts: int = 3, delay_seconds: fl
     raise RuntimeError(f"Trace {trace_id} is not fully exported yet.")
 
 
+def _run_single_judge(
+    judge_name: str,
+    *,
+    judge_inputs: dict,
+    judge_outputs: dict,
+    model_uri: str | None = None,
+):
+    judge = JUDGE_FACTORIES[judge_name](_judge_model_uri(model_uri))
+    return judge(inputs=judge_inputs, outputs=judge_outputs)
+
+
 def assess_trace(
     trace_id: str,
     *,
     judge_names: list[str] | None = None,
+    model_uri: str | None = None,
+    judge_workers: int = DEFAULT_JUDGE_WORKERS,
 ):
     configure_mlflow()
     trace = _get_trace_with_retry(trace_id)
     judge_inputs, judge_outputs = _summarize_trace(trace)
     target_judges = judge_names or list(JUDGE_FACTORIES.keys())
-    assessments = []
-    for judge_name in target_judges:
-        judge = JUDGE_FACTORIES[judge_name](JUDGE_MODEL_URI)
-        assessments.append(judge(inputs=judge_inputs, outputs=judge_outputs))
+
+    if len(target_judges) == 1 or judge_workers <= 1:
+        assessments = [
+            _run_single_judge(
+                judge_name,
+                judge_inputs=judge_inputs,
+                judge_outputs=judge_outputs,
+                model_uri=model_uri,
+            )
+            for judge_name in target_judges
+        ]
+    else:
+        assessments_by_name = {}
+        with ThreadPoolExecutor(max_workers=min(judge_workers, len(target_judges))) as executor:
+            future_to_name = {
+                executor.submit(
+                    _run_single_judge,
+                    judge_name,
+                    judge_inputs=judge_inputs,
+                    judge_outputs=judge_outputs,
+                    model_uri=model_uri,
+                ): judge_name
+                for judge_name in target_judges
+            }
+            for future in as_completed(future_to_name):
+                assessments_by_name[future_to_name[future]] = future.result()
+        assessments = [assessments_by_name[judge_name] for judge_name in target_judges]
 
     for assessment in assessments:
         mlflow.log_assessment(trace_id=trace_id, assessment=assessment)
     return assessments
 
 
+def _assess_trace_for_experiment(
+    trace_id: str,
+    judge_names: list[str],
+    *,
+    model_uri: str | None = None,
+    judge_workers: int = DEFAULT_JUDGE_WORKERS,
+):
+    try:
+        return trace_id, assess_trace(
+            trace_id,
+            judge_names=judge_names,
+            model_uri=model_uri,
+            judge_workers=judge_workers,
+        )
+    except RuntimeError as exc:
+        if "not fully exported yet" in str(exc).lower():
+            return trace_id, None
+        raise
+
+
 def assess_experiment(
     experiment_name: str,
     *,
     max_traces: int | None = None,
+    model_uri: str | None = None,
+    workers: int = DEFAULT_TRACE_WORKERS,
+    judge_workers: int = DEFAULT_JUDGE_WORKERS,
 ) -> dict[str, list]:
     unscored = find_unscored_traces(experiment_name, max_traces=max_traces)
     results: dict[str, list] = {}
-    for trace_id, judge_names in unscored:
-        try:
-            results[trace_id] = assess_trace(trace_id, judge_names=judge_names)
-        except RuntimeError as exc:
-            if "not fully exported yet" in str(exc).lower():
-                continue
-            raise
+
+    if len(unscored) <= 1 or workers <= 1:
+        for trace_id, judge_names in unscored:
+            _, assessments = _assess_trace_for_experiment(
+                trace_id,
+                judge_names,
+                model_uri=model_uri,
+                judge_workers=judge_workers,
+            )
+            if assessments is not None:
+                results[trace_id] = assessments
+        return results
+
+    with ThreadPoolExecutor(max_workers=min(workers, len(unscored))) as executor:
+        future_to_trace_id = {
+            executor.submit(
+                _assess_trace_for_experiment,
+                trace_id,
+                judge_names,
+                model_uri=model_uri,
+                judge_workers=judge_workers,
+            ): trace_id
+            for trace_id, judge_names in unscored
+        }
+        for future in as_completed(future_to_trace_id):
+            trace_id, assessments = future.result()
+            if assessments is not None:
+                results[trace_id] = assessments
     return results
 
 
-def _format_user_facing_error(exc: Exception) -> str:
+def _format_user_facing_error(exc: Exception, *, model_uri: str | None = None) -> str:
     message = str(exc)
     lowered = message.lower()
     if any(marker in lowered for marker in ["rate limit", "resource_exhausted", "quota exceeded"]):
         return (
             "Gemini judge invocation failed because the configured "
-            f"Google API key has no usable quota for {JUDGE_MODEL_URI}. "
+            f"Google API key has no usable quota for {_judge_model_uri(model_uri)}. "
             "Update quota or switch to a different judge model."
         )
     return message
@@ -276,15 +359,47 @@ def main() -> None:
         default=None,
         help="Maximum number of traces to scan when using --experiment-name.",
     )
+    parser.add_argument(
+        "--judge-model-uri",
+        default=DEFAULT_JUDGE_MODEL_URI,
+        help="Model URI for the judges.",
+    )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=DEFAULT_TRACE_WORKERS,
+        help="Parallel trace workers when using --experiment-name.",
+    )
+    parser.add_argument(
+        "--judge-workers",
+        type=int,
+        default=DEFAULT_JUDGE_WORKERS,
+        help="Parallel judge workers per trace.",
+    )
     args = parser.parse_args()
 
     try:
         if args.trace_id:
-            results = {args.trace_id: assess_trace(args.trace_id)}
+            results = {
+                args.trace_id: assess_trace(
+                    args.trace_id,
+                    model_uri=args.judge_model_uri,
+                    judge_workers=args.judge_workers,
+                )
+            }
         else:
-            results = assess_experiment(args.experiment_name, max_traces=args.max_traces)
+            results = assess_experiment(
+                args.experiment_name,
+                max_traces=args.max_traces,
+                model_uri=args.judge_model_uri,
+                workers=args.workers,
+                judge_workers=args.judge_workers,
+            )
     except Exception as exc:
-        print(_format_user_facing_error(exc), file=sys.stderr)
+        print(
+            _format_user_facing_error(exc, model_uri=args.judge_model_uri),
+            file=sys.stderr,
+        )
         raise SystemExit(1) from None
 
     if not results:
