@@ -16,6 +16,23 @@ def _clean_env(name: str, default: str = "") -> str:
     return os.getenv(name, default).strip()
 
 
+def _normalize_gemini_api_key_env() -> None:
+    """Mirror the configured Gemini API key across both env var names."""
+    google_api_key = _clean_env("GOOGLE_API_KEY")
+    gemini_api_key = _clean_env("GEMINI_API_KEY")
+    resolved_api_key = google_api_key or gemini_api_key
+    if not resolved_api_key:
+        return
+
+    if not google_api_key:
+        os.environ["GOOGLE_API_KEY"] = resolved_api_key
+    if not gemini_api_key:
+        os.environ["GEMINI_API_KEY"] = resolved_api_key
+
+
+_normalize_gemini_api_key_env()
+
+
 def slugify_summary(value: str, *, max_words: int = 8, max_length: int = 48) -> str:
     cleaned = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
     words = [word for word in cleaned.split("-") if word][:max_words]
@@ -45,10 +62,18 @@ def _require(name: str) -> str:
     return value
 
 
+def _require_gemini_api_key() -> str:
+    _normalize_gemini_api_key_env()
+    value = _clean_env("GOOGLE_API_KEY") or _clean_env("GEMINI_API_KEY")
+    if not value:
+        raise RuntimeError("Missing required environment variable: GOOGLE_API_KEY or GEMINI_API_KEY")
+    return value
+
+
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
     return Settings(
-        google_api_key=_require("GOOGLE_API_KEY"),
+        google_api_key=_require_gemini_api_key(),
         github_token=_require("GITHUB_TOKEN"),
         github_repo=_require("GITHUB_REPO"),
         github_branch=_require("GITHUB_BRANCH"),
