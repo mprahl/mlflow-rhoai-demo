@@ -23,7 +23,7 @@ def main() -> None:
     agent = build_agent()
     messages: list[dict[str, str]] = []
 
-    print("MLflow Notes Agent CLI")
+    print("MLflow Mortgage Lending Agent CLI")
     print("Type 'exit' or 'quit' to stop.\n")
 
     while True:

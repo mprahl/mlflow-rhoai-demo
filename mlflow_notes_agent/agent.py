@@ -1,4 +1,4 @@
-"""LangGraph agent definition for the MLflow notes demo."""
+"""LangGraph mortgage agent backed by llm-d and an MLflow-registered prompt."""
 
 from __future__ import annotations
 
@@ -6,37 +6,16 @@ from datetime import date
 from functools import cache
 from typing import Any
 
+import mlflow
+from langchain.agents import create_agent
+from langchain.agents.middleware import after_model, dynamic_prompt
 from langchain_core.messages import AIMessage
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langgraph.prebuilt import create_react_agent
+from langchain_openai import ChatOpenAI
 
 from mlflow_notes_agent.config import get_settings
-from mlflow_notes_agent.tools import NOTES_TOOLS
-from mlflow_notes_agent.tracing import configure_mlflow
+from mlflow_notes_agent.tools import MORTGAGE_TOOLS
 
-
-def build_system_prompt() -> str:
-    return f"""\
-You are a note-taking assistant for a Red Hat OpenShift AI demo.
-
-Your job is to help the user collect notes, optionally enrich those notes with
-DuckDuckGo or Wikipedia research, and store the final note as a markdown file in
-GitHub.
-
-Today's date is {date.today().isoformat()}.
-
-Rules:
-- Use the available tools instead of making up external facts.
-- Prefer Wikipedia for background context and DuckDuckGo for broader or current web context.
-- When the user asks what notes already exist, use the note tools.
-- When the user asks for today's date or time, answer directly or use `get_today_date`.
-- Only call `save_note` when the user clearly asks to save, create, or store a note.
-- Only call `delete_note` when the user clearly asks to delete a saved note.
-- Before saving, gather enough detail to produce a useful title, summary, and note body.
-- Keep saved notes concise, readable, and source-aware.
-- Mention which sources were used when you enriched the note with web research.
-- If the user only wants brainstorming or research, do not save anything yet.
-"""
+DEFAULT_PROMPT_URI = "prompts:/mortgage-lending-agent@production"
 
 
 def _normalize_message_content(content: Any) -> Any:
@@ -48,10 +27,9 @@ def _normalize_message_content(content: Any) -> Any:
 
     def flush_pending_text() -> None:
         nonlocal pending_text
-        if pending_text is None:
-            return
-        normalized.append(pending_text)
-        pending_text = None
+        if pending_text is not None:
+            normalized.append(pending_text)
+            pending_text = None
 
     def text_metadata(part: dict[str, Any]) -> dict[str, Any]:
         return {key: value for key, value in part.items() if key not in {"type", "text"}}
@@ -96,37 +74,52 @@ def _normalize_message_content(content: Any) -> Any:
 
 def _normalize_last_ai_message(state: dict[str, Any]) -> dict[str, list[AIMessage]]:
     messages = state.get("messages", [])
-    if not messages:
+    if not messages or not isinstance(messages[-1], AIMessage):
         return {}
 
     last_message = messages[-1]
-    if not isinstance(last_message, AIMessage):
-        return {}
-
     normalized_content = _normalize_message_content(last_message.content)
     if normalized_content == last_message.content:
         return {}
-
-    return {
-        "messages": [
-            last_message.model_copy(update={"content": normalized_content}),
-        ]
-    }
+    return {"messages": [last_message.model_copy(update={"content": normalized_content})]}
 
 
 @cache
-def build_agent():
-    configure_mlflow()
+def build_agent(prompt_uri: str = DEFAULT_PROMPT_URI):
     settings = get_settings()
-    model = ChatGoogleGenerativeAI(
-        model=settings.gemini_model,
-        temperature=0.2,
-        google_api_key=settings.google_api_key,
+    mlflow.set_experiment(settings.mlflow_experiment)
+    mlflow.langchain.autolog()
+    model = ChatOpenAI(
+        model=settings.llm_model,
+        temperature=0.1,
+        api_key=settings.llm_api_key,
+        base_url=settings.llm_base_url,
+        extra_body={"chat_template_kwargs": {"enable_thinking": False}},
     )
-    return create_react_agent(
+
+    @dynamic_prompt
+    def prompt(_request):
+        return mlflow.genai.load_prompt(prompt_uri, cache_ttl_seconds=5).format(
+            current_date=date.today().isoformat(),
+        )
+
+    @after_model
+    def normalize_message(state, _runtime):
+        return _normalize_last_ai_message(state)
+
+    return create_agent(
         model=model,
-        tools=NOTES_TOOLS,
-        prompt=build_system_prompt(),
-        post_model_hook=_normalize_last_ai_message,
-        name="mlflow_notes_agent",
+        tools=MORTGAGE_TOOLS,
+        middleware=[prompt, normalize_message],
+        name="mortgage_lending_agent",
     )
+
+
+def build_default_agent():
+    """Build the server graph without accepting LangGraph run configuration.
+
+    ``langgraph-api`` interprets every single factory argument as its run config.
+    Keep the prompt-selecting builder above for evaluations, while this zero-argument
+    factory prevents that config dictionary from being passed as ``prompt_uri``.
+    """
+    return build_agent()

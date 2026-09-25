@@ -11,3 +11,6 @@ ui/.next/
 ui/node_modules/
 dist/
 build/
+mlflow.db
+EVALUATION_DEMO_SCRIPT.md
+./mlartifacts

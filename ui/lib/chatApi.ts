@@ -36,7 +36,7 @@ export const createThread = async () => {
     return client.threads.create();
   } catch (error) {
     throw new Error(
-      `Failed to connect to the LangGraph API at ${getApiUrl()}. Start the backend with 'uv run mlflow-notes-agent-serve' or set NEXT_PUBLIC_LANGGRAPH_API_URL.`,
+      `Failed to connect to the LangGraph API at ${getApiUrl()}. Start the backend with 'uv run mlflow-fsi-agent-serve' or set NEXT_PUBLIC_LANGGRAPH_API_URL.`,
       { cause: error },
     );
   }

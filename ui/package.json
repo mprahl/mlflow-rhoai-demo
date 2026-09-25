@@ -1,5 +1,5 @@
 {
-  "name": "mlflow-notes-demo-ui",
+  "name": "mlflow-fsi-mortgage-demo-ui",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -8,9 +8,9 @@
     "start": "next start"
   },
   "dependencies": {
-    "@assistant-ui/react": "^0.12.14",
-    "@assistant-ui/react-langgraph": "^0.13.2",
-    "@assistant-ui/react-markdown": "^0.12.5",
+    "@assistant-ui/react": "^0.15.22",
+    "@assistant-ui/react-langgraph": "^0.14.30",
+    "@assistant-ui/react-markdown": "^0.14.17",
     "@langchain/langgraph-sdk": "^1.6.5",
     "@radix-ui/react-collapsible": "^1.1.12",
     "@radix-ui/react-slot": "^1.2.4",
@@ -18,7 +18,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.575.0",
-    "next": "^16.1.6",
+    "next": "^16.3.6",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "remark-gfm": "^4.0.1",

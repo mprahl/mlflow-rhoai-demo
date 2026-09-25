@@ -1,22 +1,12 @@
-"""Minimal FastAPI app used by the LangGraph dev server."""
+"""Minimal FastAPI app used by the LangGraph server."""
 
 from __future__ import annotations
-
-from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
 from mlflow_notes_agent.config import get_settings
-from mlflow_notes_agent.tracing import configure_mlflow
 
-
-@asynccontextmanager
-async def lifespan(_: FastAPI):
-    configure_mlflow()
-    yield
-
-
-app = FastAPI(title="MLflow Notes Agent", lifespan=lifespan)
+app = FastAPI(title="MLflow Mortgage Lending Agent")
 
 
 @app.get("/healthz")
@@ -26,4 +16,6 @@ def healthz() -> dict[str, str]:
         "status": "ok",
         "assistant_id": "agent",
         "mlflow_experiment": settings.mlflow_experiment,
+        "model": settings.llm_model,
+        "prompt": "mortgage-lending-agent@production",
     }

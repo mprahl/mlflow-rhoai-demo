@@ -1,7 +1,7 @@
 {
   "dependencies": ["."],
   "graphs": {
-    "agent": "./mlflow_notes_agent/agent.py:build_agent"
+    "agent": "./mlflow_notes_agent/agent.py:build_default_agent"
   },
   "http": {
     "app": "./mlflow_notes_agent/webapp.py:app"

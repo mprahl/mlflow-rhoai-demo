@@ -1,13 +1,13 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: mlflow-notes-agent-ui
-  namespace: mlflow-demo-agent
+  name: fsi-mortgage-agent-ui
+  namespace: mprahl
   labels:
-    app: mlflow-notes-agent
+    app: fsi-mortgage-agent
 spec:
   selector:
-    app: mlflow-notes-agent
+    app: fsi-mortgage-agent
   ports:
     - name: http
       port: 80

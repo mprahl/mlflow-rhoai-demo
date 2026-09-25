@@ -46,4 +46,4 @@ USER 1001
 
 EXPOSE 2024 3000
 
-CMD ["/opt/app-root/src/.venv/bin/mlflow-notes-agent-serve", "--host", "0.0.0.0", "--port", "2024"]
+CMD ["/opt/app-root/src/.venv/bin/mlflow-fsi-agent-serve", "--host", "0.0.0.0", "--port", "2024"]

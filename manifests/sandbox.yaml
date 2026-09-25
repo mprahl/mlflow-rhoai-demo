@@ -1,36 +1,41 @@
-apiVersion: apps/v1
-kind: Deployment
+apiVersion: agents.x-k8s.io/v1beta1
+kind: Sandbox
 metadata:
-  name: mlflow-notes-agent
-  namespace: mlflow-demo-agent
+  name: fsi-mortgage-agent
+  namespace: mprahl
   labels:
-    app: mlflow-notes-agent
+    app: fsi-mortgage-agent
 spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: mlflow-notes-agent
-  template:
+  operatingMode: Running
+  shutdownPolicy: Retain
+  service: false
+  podTemplate:
     metadata:
       labels:
-        app: mlflow-notes-agent
+        app: fsi-mortgage-agent
     spec:
-      serviceAccountName: mlflow-notes-agent
+      serviceAccountName: fsi-mortgage-agent
       containers:
         - name: backend
-          image: quay.io/mprahl/mlflow-rhoai-demo:latest
+          image: quay.io/mprahl/mlflow-rhoai-demo2:latest
           imagePullPolicy: Always
+          command:
+            - /opt/app-root/src/.venv/bin/mlflow-fsi-agent-serve
+          args:
+            - --host
+            - 0.0.0.0
+            - --port
+            - "2024"
+            - --allow-blocking
           ports:
             - containerPort: 2024
               name: backend-http
           envFrom:
             - secretRef:
-                name: mlflow-notes-agent-env
+                name: fsi-mortgage-agent-env
           env:
-            - name: MLFLOW_TRACKING_URI
-              value: https://mlflow.redhat-ods-applications.svc:8443
-            - name: REQUESTS_CA_BUNDLE
-              value: /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+            - name: BG_JOB_ISOLATED_LOOPS
+              value: "true"
           readinessProbe:
             httpGet:
               path: /healthz
@@ -44,11 +49,9 @@ spec:
             initialDelaySeconds: 15
             periodSeconds: 20
         - name: ui
-          image: quay.io/mprahl/mlflow-rhoai-demo:latest
+          image: quay.io/mprahl/mlflow-rhoai-demo2:latest
           imagePullPolicy: Always
-          command:
-            - node
-            - ui/server.js
+          command: ["node", "ui/server.js"]
           ports:
             - containerPort: 3000
               name: ui-http

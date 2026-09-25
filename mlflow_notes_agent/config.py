@@ -1,9 +1,8 @@
-"""Environment-backed settings for the MLflow notes demo."""
+"""Environment-backed settings for the governed mortgage lending demo."""
 
 from __future__ import annotations
 
 import os
-import re
 from dataclasses import dataclass
 from functools import lru_cache
 
@@ -16,72 +15,36 @@ def _clean_env(name: str, default: str = "") -> str:
     return os.getenv(name, default).strip()
 
 
-def _normalize_gemini_api_key_env() -> None:
-    """Mirror the configured Gemini API key across both env var names."""
-    google_api_key = _clean_env("GOOGLE_API_KEY")
-    gemini_api_key = _clean_env("GEMINI_API_KEY")
-    resolved_api_key = google_api_key or gemini_api_key
-    if not resolved_api_key:
-        return
-
-    if not google_api_key:
-        os.environ["GOOGLE_API_KEY"] = resolved_api_key
-    if not gemini_api_key:
-        os.environ["GEMINI_API_KEY"] = resolved_api_key
-
-
-_normalize_gemini_api_key_env()
-
-
-def slugify_summary(value: str, *, max_words: int = 8, max_length: int = 48) -> str:
-    cleaned = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
-    words = [word for word in cleaned.split("-") if word][:max_words]
-    slug = "-".join(words)[:max_length].strip("-")
-    return slug or "note"
+DEFAULT_LLM_BASE_URL = (
+    "http://a4144882c6b33455697ab8d7545f80a9-68042866.us-east-1.elb.amazonaws.com/"
+    "mprahl/sample-llm-inference-service/v1"
+)
+DEFAULT_LLM_MODEL = "RedHatAI/Qwen3-14B-quantized.w4a16"
 
 
 @dataclass(frozen=True)
 class Settings:
-    google_api_key: str
-    github_token: str
-    github_repo: str
-    github_branch: str
-    mlflow_tracking_uri: str
-    mlflow_tracking_auth: str
-    mlflow_workspace: str
+    llm_base_url: str
+    llm_api_key: str
+    llm_model: str
     mlflow_experiment: str
-    gemini_model: str
-    github_api_url: str
-    app_name: str
-
-
-def _require(name: str) -> str:
-    value = _clean_env(name)
-    if not value:
-        raise RuntimeError(f"Missing required environment variable: {name}")
-    return value
-
-
-def _require_gemini_api_key() -> str:
-    _normalize_gemini_api_key_env()
-    value = _clean_env("GOOGLE_API_KEY") or _clean_env("GEMINI_API_KEY")
-    if not value:
-        raise RuntimeError("Missing required environment variable: GOOGLE_API_KEY or GEMINI_API_KEY")
-    return value
+    judge_model_uri: str
+    judge_base_url: str
 
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
+    llm_model = _clean_env("LLM_MODEL", DEFAULT_LLM_MODEL)
+    llm_base_url = _clean_env("LLM_BASE_URL", DEFAULT_LLM_BASE_URL)
+    gemini_model = _clean_env("GEMINI_MODEL", "gemini-2.5-flash")
     return Settings(
-        google_api_key=_require_gemini_api_key(),
-        github_token=_require("GITHUB_TOKEN"),
-        github_repo=_require("GITHUB_REPO"),
-        github_branch=_require("GITHUB_BRANCH"),
-        mlflow_tracking_uri=_clean_env("MLFLOW_TRACKING_URI", "http://127.0.0.1:5000"),
-        mlflow_tracking_auth=_clean_env("MLFLOW_TRACKING_AUTH"),
-        mlflow_workspace=_clean_env("MLFLOW_WORKSPACE"),
-        mlflow_experiment=_clean_env("MLFLOW_EXPERIMENT", "mlflow-demo"),
-        gemini_model=_clean_env("GEMINI_MODEL", "gemini-2.5-flash"),
-        github_api_url=_clean_env("GITHUB_API_URL", "https://api.github.com"),
-        app_name=_clean_env("APP_NAME", "mlflow-notes-agent"),
+        llm_base_url=llm_base_url,
+        llm_api_key=_clean_env("LLM_API_KEY", "not-needed"),
+        llm_model=llm_model,
+        mlflow_experiment=_clean_env("MLFLOW_EXPERIMENT", "fsi-mortgage-demo"),
+        judge_model_uri=_clean_env("JUDGE_MODEL_URI", f"gemini:/{gemini_model}"),
+        judge_base_url=_clean_env(
+            "JUDGE_BASE_URL",
+            f"{llm_base_url.rstrip('/')}/chat/completions",
+        ),
     )

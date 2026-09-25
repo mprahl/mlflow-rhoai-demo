@@ -27,13 +27,13 @@
 
 :root {
   --radius: 0.75rem;
-  --background: oklch(0.985 0.004 286);
-  --foreground: oklch(0.23 0.014 286);
+  --background: oklch(0.982 0.006 185);
+  --foreground: oklch(0.22 0.02 205);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.23 0.014 286);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.23 0.014 286);
-  --primary: oklch(0.53 0.183 262);
+  --primary: oklch(0.48 0.12 190);
   --primary-foreground: oklch(0.98 0.002 286);
   --muted: oklch(0.96 0.004 286);
   --muted-foreground: oklch(0.48 0.016 286);
@@ -42,7 +42,7 @@
   --destructive: oklch(0.62 0.22 25);
   --border: oklch(0.91 0.008 286);
   --input: oklch(0.91 0.008 286);
-  --ring: oklch(0.53 0.183 262);
+  --ring: oklch(0.48 0.12 190);
 }
 
 @layer base {

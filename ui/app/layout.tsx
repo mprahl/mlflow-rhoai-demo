@@ -15,9 +15,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "MLflow Agent Notes Demo",
+  title: "MLflow Governed Mortgage Copilot",
   description:
-    "Gemini-powered LangGraph note assistant with MLflow tracing and GitHub-backed notes.",
+    "A mortgage lending copilot powered by llm-d with MLflow prompt governance, tracing, and evaluation.",
 };
 
 export default function RootLayout({

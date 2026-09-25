@@ -1,1 +1,1 @@
-"""MLflow notes demo package."""
+"""Governed mortgage lending copilot demo package."""

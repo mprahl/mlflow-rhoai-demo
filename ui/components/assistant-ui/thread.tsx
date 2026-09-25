@@ -79,30 +79,29 @@ const ThreadWelcome: FC = () => {
     <div className="mx-auto my-auto flex w-full max-w-(--thread-max-width) grow flex-col">
       <div className="flex grow flex-col justify-center px-4">
         <h1 className="font-semibold text-3xl tracking-tight">
-          MLflow Agent Notes Demo
+          Governed Mortgage Copilot
         </h1>
         <p className="mt-3 max-w-2xl text-muted-foreground text-lg">
-          Ask the agent to research a topic, combine it with your own notes, and
-          save the result as markdown in GitHub while MLflow traces the run.
+          Draft borrower follow-ups using approved pricing while protecting sensitive data.
+          MLflow traces every decision and links it to the production prompt.
         </p>
         <div className="mt-6 grid gap-3 text-sm md:grid-cols-3">
           <div className="rounded-2xl border bg-card p-4">
-            <p className="font-medium">Try asking</p>
+            <p className="font-medium">Run the scenario</p>
             <p className="mt-2 text-muted-foreground">
-              “Research MLflow agent tracing and save a short note.”
+              Paste the synthetic mortgage pricing request and draft a borrower follow-up.
             </p>
           </div>
           <div className="rounded-2xl border bg-card p-4">
-            <p className="font-medium">Use tools</p>
+            <p className="font-medium">Verify pricing</p>
             <p className="mt-2 text-muted-foreground">
-              The agent can search DuckDuckGo, search Wikipedia, and browse saved
-              notes.
+              The agent can retrieve the application, approved rate, and lending policies.
             </p>
           </div>
           <div className="rounded-2xl border bg-card p-4">
-            <p className="font-medium">Save output</p>
+            <p className="font-medium">Close the loop</p>
             <p className="mt-2 text-muted-foreground">
-              Notes are written to the configured GitHub repo and branch.
+              Judge the trace, improve the prompt, and replay the same application.
             </p>
           </div>
         </div>
@@ -118,7 +117,7 @@ const Composer: FC = () => {
         autoFocus
         rows={1}
         aria-label="Message input"
-        placeholder="Ask for research, list notes, read notes, or save a new note..."
+        placeholder="Paste a mortgage pricing request or ask for a borrower follow-up..."
         className="mb-1 max-h-32 min-h-14 w-full resize-none bg-transparent px-4 pt-2 pb-3 text-sm outline-none placeholder:text-muted-foreground"
       />
       <ComposerAction />
