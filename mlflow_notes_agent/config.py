@@ -15,10 +15,7 @@ def _clean_env(name: str, default: str = "") -> str:
     return os.getenv(name, default).strip()
 
 
-DEFAULT_LLM_BASE_URL = (
-    "http://a4144882c6b33455697ab8d7545f80a9-68042866.us-east-1.elb.amazonaws.com/"
-    "mprahl/sample-llm-inference-service/v1"
-)
+DEFAULT_LLM_BASE_URL = "https://your-llm-d-route.example.com/v1"
 DEFAULT_LLM_MODEL = "RedHatAI/Qwen3-14B-quantized.w4a16"
 
 

@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: fsi-mortgage-agent-ui
-  namespace: mprahl
+  namespace: mlflow-demo
   labels:
     app: fsi-mortgage-agent
 spec:

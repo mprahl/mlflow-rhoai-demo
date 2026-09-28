@@ -2,7 +2,7 @@ apiVersion: agents.x-k8s.io/v1beta1
 kind: Sandbox
 metadata:
   name: fsi-mortgage-agent
-  namespace: mprahl
+  namespace: mlflow-demo
   labels:
     app: fsi-mortgage-agent
 spec:
@@ -17,7 +17,7 @@ spec:
       serviceAccountName: fsi-mortgage-agent
       containers:
         - name: backend
-          image: quay.io/mprahl/mlflow-rhoai-demo2:latest
+          image: quay.io/your-org/mlflow-rhoai-demo:latest
           imagePullPolicy: Always
           command:
             - /opt/app-root/src/.venv/bin/mlflow-fsi-agent-serve
@@ -49,7 +49,7 @@ spec:
             initialDelaySeconds: 15
             periodSeconds: 20
         - name: ui
-          image: quay.io/mprahl/mlflow-rhoai-demo2:latest
+          image: quay.io/your-org/mlflow-rhoai-demo:latest
           imagePullPolicy: Always
           command: ["node", "ui/server.js"]
           ports:

@@ -167,12 +167,12 @@ Prerequisites:
 
 - Red Hat OpenShift AI with MLflow available;
 - Red Hat build of Agent Sandbox Operator installed;
-- the `mprahl` project and MLflow workspace.
+- a project and MLflow workspace named `mlflow-demo` (or update the namespace in the manifests).
 
 Select the project:
 
 ```bash
-oc project mprahl
+oc project mlflow-demo
 ```
 
 Create the application Secret from `.env`. The namespaced Kubernetes auth provider
@@ -187,19 +187,20 @@ grep -v '^MLFLOW_WORKSPACE=' .env \
   | oc apply -f -
 ```
 
-Build, push, and deploy:
+Replace `your-org` in the image name below and in `manifests/sandbox.yaml` with
+your Quay organization. Then build, push, and deploy:
 
 ```bash
-podman build -t quay.io/mprahl/mlflow-rhoai-demo2:latest .
-podman push quay.io/mprahl/mlflow-rhoai-demo2:latest
+podman build -t quay.io/your-org/mlflow-rhoai-demo:latest .
+podman push quay.io/your-org/mlflow-rhoai-demo:latest
 oc apply -k manifests
-oc wait --for=condition=Ready sandbox/fsi-mortgage-agent -n mprahl --timeout=5m
+oc wait --for=condition=Ready sandbox/fsi-mortgage-agent -n mlflow-demo --timeout=5m
 ```
 
 Get the UI URL:
 
 ```bash
-oc get route fsi-mortgage-agent-ui -n mprahl -o jsonpath='https://{.spec.host}{"\n"}'
+oc get route fsi-mortgage-agent-ui -n mlflow-demo -o jsonpath='https://{.spec.host}{"\n"}'
 ```
 
 The application uses a dedicated service account and the Kubernetes-backed MLflow
